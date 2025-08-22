@@ -3,101 +3,76 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Flip Clock – Fixed Layout</title>
+  <title>Flip Clock — Single Midline Fold</title>
   <style>
-    :root {
-      --bg: #111827;
-      --card: #0b0f19;
-      --card-inner: #0e1422;
-      --digit: #e5e7eb;
-      --divider: rgba(255,255,255,0.12);
-      --shadow: rgba(0,0,0,0.5);
+    :root{
+      --bg:#111827;--card:#0b0f19;--card-inner:#0e1422;--digit:#e5e7eb;--divider:rgba(255,255,255,.12);--shadow:rgba(0,0,0,.5)
     }
+    html,body{height:100%;margin:0;background:var(--bg);color:#fff;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{min-height:100%;display:grid;grid-template-rows:auto 1fr}
+    .controls{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;padding:10px 14px;background:rgba(0,0,0,.25);position:sticky;top:0;backdrop-filter:blur(6px);z-index:10}
+    .controls label{font-size:14px;color:#cbd5e1}
+    select,input[type="checkbox"],button{font-size:14px;padding:6px 8px;background:#0b0f19;color:#e5e7eb;border:1px solid #1f2937;border-radius:8px}
+    button{cursor:pointer}
+    .screen{display:grid;place-items:center;height:100%;padding:16px}
+    .clock{display:flex;gap:clamp(8px,2vw,16px);align-items:center}
 
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: white;
-      font-family: system-ui, sans-serif;
-    }
+    /* Card */
+    .flip{position:relative;width:clamp(90px,12vw,180px);height:clamp(120px,16vw,240px);perspective:1600px;perspective-origin:center 50%}
+    .card{position:relative;width:100%;height:100%;border-radius:16px;background:linear-gradient(180deg,var(--card),var(--card-inner));box-shadow:0 12px 28px var(--shadow)}
 
-    .wrap { min-height: 100%; display: grid; grid-template-rows: auto 1fr; }
+    /* Halves fill whole card then get clipped */
+    .half{position:absolute;inset:0;display:grid;place-items:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform-style:preserve-3d}
+    .half.top{clip-path:inset(0 0 50% 0)}
+    .half.bottom{clip-path:inset(50% 0 0 0)}
 
-    .controls {
-      display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
-      padding: 10px 14px;
-      background: rgba(0,0,0,0.25);
-      position: sticky; top: 0;
-      backdrop-filter: blur(6px);
-      z-index: 10;
-    }
+    /* Pivot modes */
+    .pivot-midline .half.top{transform-origin:center bottom}
+    .pivot-center  .half.top{transform-origin:center center}
 
-    .controls label { font-size: 14px; color: #cbd5e1; }
-    select, input[type="checkbox"], button {
-      font-size: 14px; padding: 6px 8px;
-      background: #0b0f19; color: #e5e7eb;
-      border: 1px solid #1f2937; border-radius: 6px;
-    }
-    button { cursor: pointer; }
+    .half.top.back{transform:rotateX(180deg)}
 
-    .screen { display: flex; justify-content: center; align-items: center; height: 100%; }
-    .clock { display: flex; gap: 12px; align-items: center; }
+    .glyph{font-weight:800;font-variant-numeric:tabular-nums;font-size:clamp(64px,10vw,140px);line-height:1;color:var(--digit)}
 
-    .flip { position: relative; width: 100px; height: 140px; perspective: 1000px; }
-    .flip .card {
-      width: 100%; height: 100%; border-radius: 10px;
-      background: linear-gradient(180deg, var(--card), var(--card-inner));
-      box-shadow: 0 6px 16px var(--shadow);
-      overflow: hidden; position: relative;
-    }
-    .flip .top, .flip .bottom, .flip .back-top, .flip .back-bottom {
-      position: absolute; left: 0; right: 0; height: 50%; display: grid; place-items: center;
-      font-weight: 800; font-variant-numeric: tabular-nums;
-      font-size: clamp(64px, 10vw, 140px); color: var(--digit);
-      line-height: 1;
-      backface-visibility: hidden; -webkit-backface-visibility: hidden;
-      transform-style: preserve-3d;
-    }
-    .flip .top { top: 0; border-bottom: 1px solid var(--divider); }
-    .flip .bottom { bottom: 0; border-top: 1px solid var(--divider); }
-    .flip .back-top { top: 0; transform-origin: center bottom; transform: rotateX(180deg); }
-    .flip .back-bottom { bottom: 0; transform-origin: center top; }
-    .flip .midline { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--divider); }
+    .midline{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--divider)}
+    .ampm{position:absolute;bottom:8px;left:10px;font-size:12px;color:#9aa3af;letter-spacing:.08em}
 
-    .flip.animate .top {
-      animation: fold 0.6s ease-in forwards;
-      transform-origin: center bottom;
-      z-index: 3;
-      backface-visibility: hidden; -webkit-backface-visibility: hidden;
-      will-change: transform;
-    }
-    .flip.animate .back-bottom {
-      animation: unfold 0.6s ease-out forwards;
-      z-index: 2;
-      backface-visibility: hidden; -webkit-backface-visibility: hidden;
-      will-change: transform;
-    }
-    @keyframes fold { from { transform: rotateX(0); } to { transform: rotateX(-180deg); } }
-    @keyframes unfold { from { transform: rotateX(180deg); } to { transform: rotateX(0); } }
+    /* Colon + date */
+    .colon{width:clamp(22px,3vw,36px);height:clamp(100px,14vw,210px);display:grid;grid-template-rows:1fr 1fr;gap:12px;align-items:center;justify-items:center;opacity:.9}
+    .dot{width:12px;height:12px;border-radius:50%;background:var(--digit)}
+    .date{margin-top:clamp(10px,2vw,18px);text-align:center;font-size:clamp(14px,2vw,22px);color:#cbd5e1}
 
-    .colon { display: flex; flex-direction: column; justify-content: center; gap: 12px; }
-    .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--digit); }
+    /* Single-phase animation: only top half flips over the midline */
+    @keyframes topFold{from{transform:rotateX(0) translateZ(0.01px)}to{transform:rotateX(-180deg) translateZ(0.01px)}}
+    @keyframes topReveal{from{transform:rotateX(180deg) translateZ(0.01px)}to{transform:rotateX(0) translateZ(0.01px)}}
 
-    .date { margin-top: 20px; text-align: center; font-size: 18px; color: #cbd5e1; }
-    .ampm { position: absolute; bottom: 6px; right: 8px; font-size: 12px; color: #94a3b8; }
+    .flip-top .half.top.front{animation:topFold .36s cubic-bezier(.37,.01,.64,1) forwards; z-index:3; will-change:transform}
+    .flip-top .half.top.back {animation:topReveal .36s cubic-bezier(.37,.01,.64,1) forwards; z-index:2; will-change:transform}
   </style>
 </head>
-<body>
+<body class="pivot-midline">
   <div class="wrap">
     <div class="controls">
-      <label><input id="modeToggle" type="checkbox"/> 24-jam</label>
-      <label> Zon GMT: <select id="tzPicker"></select></label>
+      <label><input id="modeToggle" type="checkbox"/> 24‑jam</label>
+      <label> Zon GMT:
+        <select id="tzPicker"></select>
+      </label>
       <label> Tema latar:
         <select id="bgPicker">
-          <option value="#111827">Gelap</option>
+          <option value="#111827">Gelap (Default)</option>
           <option value="#000000">Hitam</option>
+          <option value="#1f2937">Kelabu</option>
+          <option value="#0ea5e9">Biru</option>
+          <option value="#10b981">Hijau</option>
+          <option value="#ef4444">Merah</option>
+          <option value="#a855f7">Ungu</option>
           <option value="#ffffff">Putih</option>
+        </select>
+      </label>
+      <label> Pivot:
+        <select id="pivotPicker">
+          <option value="pivot-midline" selected>Midline (Classic)</option>
+          <option value="pivot-center">Center (Experimental)</option>
         </select>
       </label>
       <button id="fsBtn">Full Screen</button>
@@ -123,92 +98,118 @@
   <script>
     const pad2 = n => (n<10?"0"+n:n);
     let currentTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const updateFns = {};
 
-    function buildCard(el, value, ampm=''){
-      el.innerHTML=`<div class="card">
-        <div class="top">${value}</div>
-        <div class="bottom">${value}</div>
-        <div class="back-top">${value}</div>
-        <div class="back-bottom">${value}</div>
-        <div class="midline"></div>
-        ${ampm?`<div class="ampm">${ampm}</div>`:''}
-      </div>`;
+    function makeDigit(el, value, badge=''){
+      el.innerHTML = `
+        <div class="card">
+          <div class="half top front"><div class="glyph">${value}</div></div>
+          <div class="half top back"><div class="glyph">${value}</div></div>
+          <div class="half bottom front"><div class="glyph">${value}</div></div>
+          <div class="midline"></div>
+          ${badge?`<div class="ampm">${badge}</div>`:''}
+        </div>`;
     }
 
-    function flipTo(el,val,ampm=''){
-      const top=el.querySelector('.top');
-      const bottom=el.querySelector('.bottom');
-      const backTop=el.querySelector('.back-top');
-      const backBottom=el.querySelector('.back-bottom');
-      if(top.textContent===val) return;
-      backTop.textContent=val; backBottom.textContent=val;
-      const badge=el.querySelector('.ampm');
-      if(badge||ampm){ if(badge) badge.textContent=ampm; }
-      el.classList.remove('animate'); void el.offsetWidth; el.classList.add('animate');
-      setTimeout(()=>{ top.textContent=val; bottom.textContent=val; el.classList.remove('animate'); },600);
+    function flipTo(el, nextVal, badgeText=''){
+      const tFront = el.querySelector('.half.top.front .glyph');
+      const bFront = el.querySelector('.half.bottom.front .glyph');
+      const tBack  = el.querySelector('.half.top.back .glyph');
+      if (tFront.textContent === nextVal) return;
+
+      tBack.textContent = nextVal; // next value only on top back
+      const badge = el.querySelector('.ampm');
+      if (badge || badgeText){ if (badge) badge.textContent = badgeText; }
+
+      // Start single-phase flip on top
+      el.classList.remove('flip-top'); void el.offsetWidth; el.classList.add('flip-top');
+
+      const DUR = 360; // ms, must match CSS .36s
+      // At halfway point, swap the bottom to NEXT so after fold the digit is complete
+      setTimeout(()=>{ bFront.textContent = nextVal; }, Math.round(DUR/2));
+
+      function onDone(e){
+        if (e.animationName !== 'topFold') return;
+        el.removeEventListener('animationend', onDone);
+        // Sync top front to NEXT as well (for next cycle)
+        tFront.textContent = nextVal;
+        el.classList.remove('flip-top');
+      }
+      el.addEventListener('animationend', onDone);
     }
 
-    function setupDigit(id,val,ampm=''){
-      const el=document.getElementById(id);
-      buildCard(el,val,ampm);
-      return (v,a=ampm)=>flipTo(el,v,a);
+    function setupDigit(id, initial, badge=''){
+      const el = document.getElementById(id);
+      makeDigit(el, initial, badge);
+      return (v,b=badge)=>flipTo(el,v,b);
     }
 
+    function parts(now){
+      const fmt = new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:currentTZ}).formatToParts(now);
+      return {
+        h: parseInt(fmt.find(p=>p.type==='hour').value,10),
+        m: fmt.find(p=>p.type==='minute').value,
+        s: fmt.find(p=>p.type==='second').value,
+      };
+    }
+
+    const upd = {};
     function init(){
-      const now=new Date();
-      const is24=document.getElementById('modeToggle').checked;
-      const parts=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:currentTZ}).formatToParts(now);
-      const h=parseInt(parts.find(p=>p.type==='hour').value);
-      const m=parts.find(p=>p.type==='minute').value;
-      const s=parts.find(p=>p.type==='second').value;
-      const hour=is24?h:((h+11)%12)+1;
-      const ampm=h<12?'AM':'PM';
-      const [h1,h2]=pad2(hour).split('');
-      const [m1,m2]=m.split('');
-      const [s1,s2]=s.split('');
-      updateFns.h1=setupDigit('h1',h1,is24?'':ampm);
-      updateFns.h2=setupDigit('h2',h2);
-      updateFns.m1=setupDigit('m1',m1);
-      updateFns.m2=setupDigit('m2',m2);
-      updateFns.s1=setupDigit('s1',s1);
-      updateFns.s2=setupDigit('s2',s2);
+      const now = new Date();
+      const is24 = document.getElementById('modeToggle').checked;
+      const {h,m,s} = parts(now);
+      const hour = is24 ? h : ((h+11)%12)+1;
+      const ampm = h<12? 'AM' : 'PM';
+      const [h1,h2] = pad2(hour).split('');
+      const [m1,m2] = m.split('');
+      const [s1,s2] = s.split('');
+      upd.h1 = setupDigit('h1', h1, is24?'':ampm);
+      upd.h2 = setupDigit('h2', h2);
+      upd.m1 = setupDigit('m1', m1);
+      upd.m2 = setupDigit('m2', m2);
+      upd.s1 = setupDigit('s1', s1);
+      upd.s2 = setupDigit('s2', s2);
       updateDate(now);
     }
 
     function tick(){
-      const now=new Date();
-      const is24=document.getElementById('modeToggle').checked;
-      const parts=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:currentTZ}).formatToParts(now);
-      const h=parseInt(parts.find(p=>p.type==='hour').value);
-      const m=parts.find(p=>p.type==='minute').value;
-      const s=parts.find(p=>p.type==='second').value;
-      const hour=is24?h:((h+11)%12)+1;
-      const ampm=h<12?'AM':'PM';
-      const [h1,h2]=pad2(hour).split('');
-      const [m1,m2]=m.split('');
-      const [s1,s2]=s.split('');
-      updateFns.h1(h1,is24?'':ampm);
-      updateFns.h2(h2);
-      updateFns.m1(m1);
-      updateFns.m2(m2);
-      updateFns.s1(s1);
-      updateFns.s2(s2);
-      if(s==='00') updateDate(now);
+      const now = new Date();
+      const is24 = document.getElementById('modeToggle').checked;
+      const {h,m,s} = parts(now);
+      const hour = is24 ? h : ((h+11)%12)+1;
+      const ampm = h<12? 'AM' : 'PM';
+      const [H1,H2] = pad2(hour).split('');
+      const [M1,M2] = m.split('');
+      const [S1,S2] = s.split('');
+      upd.h1(H1, is24?'':ampm); upd.h2(H2);
+      upd.m1(M1); upd.m2(M2);
+      upd.s1(S1); upd.s2(S2);
+      if (s==='00') updateDate(now);
     }
 
     function updateDate(d){
       const opts={weekday:'short',year:'numeric',month:'short',day:'2-digit',timeZone:currentTZ};
-      document.getElementById('date').textContent=d.toLocaleDateString(undefined,opts);
+      document.getElementById('date').textContent = d.toLocaleDateString(undefined, opts);
     }
 
-    document.getElementById('modeToggle').addEventListener('change',()=>init());
-    document.getElementById('bgPicker').addEventListener('change',(e)=>{document.documentElement.style.setProperty('--bg',e.target.value);});
+    // Controls
+    document.getElementById('modeToggle').addEventListener('change', init);
+    document.getElementById('bgPicker').addEventListener('change', e=>{document.documentElement.style.setProperty('--bg', e.target.value)});
     document.getElementById('fsBtn').addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();});
 
+    // Pivot picker
+    const pivotPicker=document.getElementById('pivotPicker');
+    pivotPicker.addEventListener('change', e=>{
+      document.body.classList.remove('pivot-midline','pivot-center');
+      document.body.classList.add(e.target.value);
+    });
+
+    // TZ picker
     const tzPicker=document.getElementById('tzPicker');
-    Intl.supportedValuesOf('timeZone').forEach(tz=>{const opt=document.createElement('option');opt.value=tz;opt.textContent=tz;if(tz===currentTZ)opt.selected=true;tzPicker.appendChild(opt);});
-    tzPicker.addEventListener('change',e=>{currentTZ=e.target.value;init();});
+    const tzList = (Intl.supportedValuesOf && Intl.supportedValuesOf('timeZone')) || [
+      'UTC','Asia/Kuala_Lumpur','Asia/Singapore','Asia/Tokyo','Europe/London','America/New_York','America/Los_Angeles','Australia/Sydney'
+    ];
+    tzList.forEach(tz=>{const o=document.createElement('option');o.value=tz;o.textContent=tz;if(tz===currentTZ)o.selected=true;tzPicker.appendChild(o)});
+    tzPicker.addEventListener('change',e=>{currentTZ=e.target.value;init()});
 
     init();
     setInterval(tick,1000);
