@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flip Clock – Mac-style Screensaver</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --card: #0b0f19;
+      --card-inner: #0e1422;
+      --digit: #e5e7eb;
+      --divider: rgba(255,255,255,0.12);
+      --accent: #6b7280;
+      --shadow: rgba(0,0,0,0.5);
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: white;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+
+    .wrap { min-height: 100%; display: grid; grid-template-rows: 1fr auto; }
+
+    .controls {
+      display: flex; gap: 1rem; align-items: center;
+      padding: 10px 14px;
+      background: rgba(0,0,0,0.25);
+      position: sticky; top: 0;
+      backdrop-filter: blur(6px);
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    .controls label { font-size: 14px; color: #cbd5e1; }
+    select, input[type="checkbox"], button {
+      font-size: 14px; padding: 6px 8px;
+      background: #0b0f19; color: #e5e7eb;
+      border: 1px solid #1f2937; border-radius: 8px;
+    }
+    button { cursor: pointer; }
+
+    .screen { display: grid; place-items: center; padding: clamp(12px, 2vw, 24px); }
+    .clock { display: flex; gap: clamp(8px, 2vw, 16px); align-items: center; justify-content: center; }
+
+    .flip { position: relative; width: clamp(90px, 12vw, 180px); height: clamp(120px, 16vw, 240px); perspective: 1000px; }
+    .flip .card { position: relative; width: 100%; height: 100%; border-radius: 16px;
+      background: linear-gradient(180deg, var(--card), var(--card-inner)); box-shadow: 0 12px 28px var(--shadow);
+      overflow: hidden; }
+    .flip .top, .flip .bottom, .flip .back-top, .flip .back-bottom {
+      position: absolute; left: 0; right: 0; height: 50%; display: grid; place-items: center;
+      font-weight: 800; font-variant-numeric: tabular-nums;
+      font-size: clamp(64px, 10vw, 140px); color: var(--digit);
+    }
+    .flip .top { top: 0; border-bottom: 1px solid var(--divider); }
+    .flip .bottom { bottom: 0; border-top: 1px solid var(--divider); }
+    .flip .back-top { top: 0; transform-origin: center bottom; transform: rotateX(180deg); }
+    .flip .back-bottom { bottom: 0; transform-origin: center top; }
+    .flip .midline { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--divider); }
+    .flip.animate .top { animation: fold 0.6s ease-in forwards; transform-origin: center bottom; z-index: 3; backface-visibility: hidden; }
+    .flip.animate .back-bottom { animation: unfold 0.6s ease-out forwards; z-index: 2; }
+    @keyframes fold { 0%{transform:rotateX(0);} 100%{transform:rotateX(-180deg);} }
+    @keyframes unfold { 0%{transform:rotateX(180deg);} 100%{transform:rotateX(0);} }
+
+    .colon { width: clamp(22px, 3vw, 36px); height: clamp(100px, 14vw, 210px);
+      display: grid; grid-template-rows: 1fr 1fr; gap: 12px;
+      align-items: center; justify-items: center; opacity: 0.9; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--digit); }
+
+    .date { margin-top: clamp(10px, 2vw, 18px); text-align: center; font-size: clamp(14px, 2vw, 22px); color: #cbd5e1; }
+
+    .ampm { position: absolute; bottom: 10px; right: 14px; font-size: clamp(10px, 1.4vw, 14px); color: #94a3b8; }
+
+    @media (max-width: 480px) { .flip { width: 28vw; height: 38vw; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="controls">
+      <label><input id="modeToggle" type="checkbox" /> 24‑jam</label>
+      <label> Tema latar:
+        <select id="bgPicker">
+          <option value="#111827">Gelap (Default)</option>
+          <option value="#000000">Hitam</option>
+          <option value="#1f2937">Kelabu</option>
+          <option value="#0ea5e9">Biru</option>
+          <option value="#10b981">Hijau</option>
+          <option value="#ef4444">Merah</option>
+          <option value="#a855f7">Ungu</option>
+          <option value="#ffffff">Putih</option>
+        </select>
+      </label>
+      <label> Zon GMT:
+        <select id="tzPicker"></select>
+      </label>
+      <button id="fsBtn">Full Screen</button>
+    </div>
+
+    <div class="screen">
+      <div>
+        <div class="clock">
+          <div class="flip" id="h1"></div>
+          <div class="flip" id="h2"></div>
+          <div class="colon"><div class="dot"></div><div class="dot"></div></div>
+          <div class="flip" id="m1"></div>
+          <div class="flip" id="m2"></div>
+          <div class="colon"><div class="dot"></div><div class="dot"></div></div>
+          <div class="flip" id="s1"></div>
+          <div class="flip" id="s2"></div>
+        </div>
+        <div class="date" id="date"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+
+    function buildCard(el, value, ampmText = '') {
+      el.innerHTML = `<div class="card">
+        <div class="top">${value}</div>
+        <div class="bottom">${value}</div>
+        <div class="back-top">${value}</div>
+        <div class="back-bottom">${value}</div>
+        <div class="midline"></div>
+        ${ampmText ? `<div class="ampm">${ampmText}</div>` : ''}
+      </div>`;
+    }
+
+    function flipTo(el, newValue, ampmText = '') {
+      const curTop = el.querySelector('.top');
+      const curBottom = el.querySelector('.bottom');
+      const backTop = el.querySelector('.back-top');
+      const backBottom = el.querySelector('.back-bottom');
+      if (curTop.textContent === newValue) return;
+      backTop.textContent = newValue;
+      backBottom.textContent = newValue;
+      const badge = el.querySelector('.ampm');
+      if (badge || ampmText) {
+        if (badge) badge.textContent = ampmText;
+        else if (ampmText) {
+          const span = document.createElement('div');
+          span.className = 'ampm';
+          span.textContent = ampmText;
+          el.querySelector('.card').appendChild(span);
+        }
+      }
+      el.classList.remove('animate'); void el.offsetWidth; el.classList.add('animate');
+      setTimeout(() => {
+        curTop.textContent = newValue;
+        curBottom.textContent = newValue;
+        el.classList.remove('animate');
+      }, 600);
+    }
+
+    function setupDigit(id, initial, ampmText = '') {
+      const el = document.getElementById(id);
+      buildCard(el, initial, ampmText);
+      return (value, badgeText = ampmText) => flipTo(el, value, badgeText);
+    }
+
+    const updateFns = {};
+    let currentTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    function init() {
+      const now = new Date();
+      const opts = { timeZone: currentTZ };
+      const parts = new Intl.DateTimeFormat('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', ...opts }).formatToParts(now);
+      const h = parts.find(p=>p.type==='hour').value;
+      const m = parts.find(p=>p.type==='minute').value;
+      const s = parts.find(p=>p.type==='second').value;
+      const rawHour = parseInt(h);
+      const is24 = document.getElementById('modeToggle').checked;
+      const hour = is24 ? rawHour : ((rawHour + 11) % 12) + 1;
+      const ampm = rawHour < 12 ? 'AM' : 'PM';
+
+      const [h1, h2] = pad2(hour).split('');
+      const [m1, m2] = m.split('');
+      const [s1, s2] = s.split('');
+
+      updateFns.h1 = setupDigit('h1', h1, is24 ? '' : ampm);
+      updateFns.h2 = setupDigit('h2', h2);
+      updateFns.m1 = setupDigit('m1', m1);
+      updateFns.m2 = setupDigit('m2', m2);
+      updateFns.s1 = setupDigit('s1', s1);
+      updateFns.s2 = setupDigit('s2', s2);
+
+      updateDate(now);
+    }
+
+    function updateDate(d) {
+      const opts = { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', timeZone: currentTZ };
+      document.getElementById('date').textContent = d.toLocaleDateString(undefined, opts);
+    }
+
+    function tick() {
+      const now = new Date();
+      const opts = { timeZone: currentTZ };
+      const parts = new Intl.DateTimeFormat('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', ...opts }).formatToParts(now);
+      const h = parts.find(p=>p.type==='hour').value;
+      const m = parts.find(p=>p.type==='minute').value;
+      const s = parts.find(p=>p.type==='second').value;
+      const rawHour = parseInt(h);
+      const is24 = document.getElementById('modeToggle').checked;
+      const hour = is24 ? rawHour : ((rawHour + 11) % 12) + 1;
+      const ampm = rawHour < 12 ? 'AM' : 'PM';
+      const [h1, h2] = pad2(hour).split('');
+      const [m1, m2] = m.split('');
+      const [s1, s2] = s.split('');
+      updateFns.h1(h1, is24 ? '' : ampm);
+      updateFns.h2(h2);
+      updateFns.m1(m1);
+      updateFns.m2(m2);
+      updateFns.s1(s1);
+      updateFns.s2(s2);
+      if (s === '00') updateDate(now);
+    }
+
+    document.getElementById('modeToggle').addEventListener('change', () => init());
+    document.getElementById('bgPicker').addEventListener('change', (e) => {
+      document.documentElement.style.setProperty('--bg', e.target.value);
+    });
+
+    // Populate timezone selector
+    const tzPicker = document.getElementById('tzPicker');
+    Intl.supportedValuesOf('timeZone').forEach(tz => {
+      const opt = document.createElement('option');
+      opt.value = tz; opt.textContent = tz;
+      if (tz === currentTZ) opt.selected = true;
+      tzPicker.appendChild(opt);
+    });
+    tzPicker.addEventListener('change', (e)=>{ currentTZ = e.target.value; init(); });
+
+    // Fullscreen button
+    document.getElementById('fsBtn').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    init();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
