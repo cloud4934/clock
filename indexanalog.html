@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analog Clock — Zon Waktu & Tema</title>
+  <style>
+    :root{
+      --bg:#111827;--face:#0b0f19;--rim:#111827;--glass:rgba(255,255,255,.06);
+      --tick:#e5e7eb;--subtick:#9aa3af;--hand:#e5e7eb;--second:#ef4444;--shadow:rgba(0,0,0,.55)
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:#fff;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{min-height:100%;display:grid;grid-template-rows:auto 1fr}
+    .controls{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;padding:10px 14px;background:rgba(0,0,0,.25);position:sticky;top:0;backdrop-filter:blur(6px);z-index:10}
+    .controls label{font-size:14px;color:#cbd5e1}
+    select,input[type="checkbox"],button{font-size:14px;padding:6px 8px;background:#0b0f19;color:#e5e7eb;border:1px solid #1f2937;border-radius:8px}
+    button{cursor:pointer}
+    .screen{display:grid;place-items:center;height:100%;padding:16px}
+
+    /* Card-style holder */
+    .card{background:linear-gradient(180deg,var(--face),#0e1422);border-radius:20px;box-shadow:0 18px 40px var(--shadow);padding:24px}
+    .clock-wrap{display:grid;place-items:center}
+    .date{margin-top:12px;text-align:center;font-size:clamp(14px,2vw,20px);color:#cbd5e1}
+
+    /* Badge AM/PM */
+    .badge{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:12px;color:#9aa3af;letter-spacing:.08em;background:#0b0f19;border:1px solid #1f2937;border-radius:999px;padding:4px 8px;opacity:.9}
+
+    /* Hide the old pivot control space if copy-pasted from previous */
+    .controls .hidden{display:none !important}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="controls">
+      <label><input id="modeToggle" type="checkbox"/> 24-jam</label>
+      <label> Zon GMT:
+        <select id="tzPicker"></select>
+      </label>
+      <label> Tema latar:
+        <select id="bgPicker">
+          <option value="#111827">Gelap (Default)</option>
+          <option value="#000000">Hitam</option>
+          <option value="#1f2937">Kelabu</option>
+          <option value="#0ea5e9">Biru</option>
+          <option value="#10b981">Hijau</option>
+          <option value="#ef4444">Merah</option>
+          <option value="#a855f7">Ungu</option>
+          <option value="#ffffff">Putih</option>
+        </select>
+      </label>
+      <button id="fsBtn">Full Screen</button>
+    </div>
+
+    <div class="screen">
+      <div class="card">
+        <div class="clock-wrap" style="position:relative">
+          <!-- Responsive SVG clock -->
+          <svg id="dial" viewBox="0 0 300 300" width="min(86vw,560px)" height="min(86vw,560px)" aria-label="Analog clock">
+            <!-- Rim -->
+            <defs>
+              <radialGradient id="rimGrad" cx="50%" cy="50%" r="70%">
+                <stop offset="0%" stop-color="#0f172a"/>
+                <stop offset="100%" stop-color="var(--rim)"/>
+              </radialGradient>
+              <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="black" flood-opacity=".5"/>
+              </filter>
+            </defs>
+            <circle cx="150" cy="150" r="140" fill="url(#rimGrad)" />
+            <circle cx="150" cy="150" r="132" fill="var(--face)" filter="url(#shadow)"/>
+            <!-- Minor ticks -->
+            <g id="ticks"></g>
+            <!-- Numerals -->
+            <g id="nums" font-family="system-ui,Segoe UI,Roboto,Helvetica,Arial" font-size="16" fill="var(--tick)" text-anchor="middle" dominant-baseline="middle"></g>
+            <!-- Hands -->
+            <g id="hands" stroke-linecap="round">
+              <!-- hour -->
+              <line id="hHand" x1="150" y1="160" x2="150" y2="92" stroke="var(--hand)" stroke-width="6"/>
+              <!-- minute -->
+              <line id="mHand" x1="150" y1="168" x2="150" y2="60" stroke="var(--hand)" stroke-width="4"/>
+              <!-- second -->
+              <line id="sHand" x1="150" y1="175" x2="150" y2="46" stroke="var(--second)" stroke-width="2"/>
+              <!-- counterweight -->
+              <circle cx="150" cy="150" r="5" fill="var(--second)"/>
+              <circle cx="150" cy="150" r="2.5" fill="#000000aa"/>
+            </g>
+            <!-- Glass glow -->
+            <ellipse cx="120" cy="80" rx="80" ry="32" fill="var(--glass)"/>
+          </svg>
+          <div class="badge" id="ampm">AM</div>
+        </div>
+        <div class="date" id="date"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Build ticks & numbers
+    (function buildDial(){
+      const ticks = document.getElementById('ticks');
+      const nums = document.getElementById('nums');
+      for(let i=0;i<60;i++){
+        const a = i*Math.PI/30; // radians
+        const rOuter = 125, rInner = (i%5===0)?110:118;
+        const x1 = 150 + rInner*Math.sin(a);
+        const y1 = 150 - rInner*Math.cos(a);
+        const x2 = 150 + rOuter*Math.sin(a);
+        const y2 = 150 - rOuter*Math.cos(a);
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+        line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+        line.setAttribute('stroke', i%5===0 ? 'var(--tick)' : 'var(--subtick)');
+        line.setAttribute('stroke-width', i%5===0 ? '3' : '1.5');
+        ticks.appendChild(line);
+
+        if(i%5===0){
+          const n = (i/5)||12;
+          const rNum = 96;
+          const nx = 150 + rNum*Math.sin(a);
+          const ny = 150 - rNum*Math.cos(a);
+          const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+          t.setAttribute('x', nx); t.setAttribute('y', ny+1);
+          t.textContent = n;
+          nums.appendChild(t);
+        }
+      }
+    })();
+
+    // Helpers
+    const pad2 = n => (n<10?"0"+n:n);
+    function getParts(now, tz){
+      const fmt = new Intl.DateTimeFormat('en-GB',
+        {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:tz}
+      ).formatToParts(now);
+      return {
+        h: parseInt(fmt.find(p=>p.type==='hour').value,10),
+        m: parseInt(fmt.find(p=>p.type==='minute').value,10),
+        s: parseInt(fmt.find(p=>p.type==='second').value,10),
+      };
+    }
+
+    function updateDate(now){
+      const opts={weekday:'short',year:'numeric',month:'short',day:'2-digit',timeZone:currentTZ};
+      document.getElementById('date').textContent = now.toLocaleDateString(undefined, opts);
+    }
+
+    // Animate
+    const hHand=document.getElementById('hHand');
+    const mHand=document.getElementById('mHand');
+    const sHand=document.getElementById('sHand');
+    const ampmBadge=document.getElementById('ampm');
+
+    function setRotate(el, deg){
+      el.setAttribute('transform', `rotate(${deg} 150 150)`);
+    }
+
+    function tick(){
+      const now = new Date();
+      const {h,m,s} = getParts(now, currentTZ);
+      const is24 = document.getElementById('modeToggle').checked;
+
+      const hour12 = ((h+11)%12)+1;
+      const ampm = h<12 ? 'AM' : 'PM';
+      ampmBadge.textContent = is24 ? `${pad2(h)}:${pad2(m)}` : ampm; // 24h → tunjuk jam:mm; 12h → AM/PM
+
+      // Angles
+      const hDeg = (h%12)*30 + m*0.5 + s*(0.5/60);
+      const mDeg = m*6 + s*0.1;
+      const sDeg = s*6;
+
+      setRotate(hHand, hDeg);
+      setRotate(mHand, mDeg);
+      setRotate(sHand, sDeg);
+
+      if(s===0) updateDate(now);
+    }
+
+    // Controls
+    document.getElementById('bgPicker').addEventListener('change', e=>{
+      document.documentElement.style.setProperty('--bg', e.target.value);
+      // Auto-contrast for white background
+      if(e.target.value === '#ffffff'){
+        document.documentElement.style.setProperty('--tick','#111827');
+        document.documentElement.style.setProperty('--subtick','#4b5563');
+        document.documentElement.style.setProperty('--hand','#111827');
+        document.documentElement.style.setProperty('--rim','#e5e7eb');
+      }else{
+        document.documentElement.style.setProperty('--tick','#e5e7eb');
+        document.documentElement.style.setProperty('--subtick','#9aa3af');
+        document.documentElement.style.setProperty('--hand','#e5e7eb');
+        document.documentElement.style.setProperty('--rim','#111827');
+      }
+    });
+
+    document.getElementById('fsBtn').addEventListener('click',()=>{
+      if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    });
+
+    // TZ picker
+    const tzPicker=document.getElementById('tzPicker');
+    const tzList = (Intl.supportedValuesOf && Intl.supportedValuesOf('timeZone')) || [
+      'UTC','Asia/Kuala_Lumpur','Asia/Singapore','Asia/Tokyo','Europe/London','America/New_York','America/Los_Angeles','Australia/Sydney'
+    ];
+    tzList.forEach(tz=>{
+      const o=document.createElement('option');
+      o.value=tz;o.textContent=tz;if(tz===currentTZ)o.selected=true;tzPicker.appendChild(o);
+    });
+    tzPicker.addEventListener('change',e=>{currentTZ=e.target.value;updateDate(new Date());});
+
+    // Start
+    updateDate(new Date());
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
